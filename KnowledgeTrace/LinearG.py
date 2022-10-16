@@ -14,13 +14,13 @@ train_data = pd.read_csv(train_path)[:38077]
 final_data = pd.read_csv(final_path)
 
 final_student_list = np.asarray(list(final_data["student"])).reshape((-1, 1))
-# test_questionList = list(test_data["question"])
+final_questionList =  np.asarray(list(final_data["question"])).reshape((-1, 1))
 final_skill_list = list(final_data["skill"])
 
 stuList = list(train_data["student"])
 studentList = np.asarray(stuList).reshape((-1, 1))
 skillList = list(train_data["skill"])
-# questionList = list(data["question"])
+questionList = np.asarray(list(train_data["question"])).reshape((-1, 1))
 correctList = list(train_data["correctness"])
 
 stu_TF = np.zeros((len(skillList), 2))
@@ -58,20 +58,25 @@ scaler = MinMaxScaler(feature_range=[-0.8, 0.8])
 studentList = scaler.fit_transform(studentList)
 stu_TF = scaler.fit_transform(stu_TF)
 final_student_list = scaler.fit_transform(final_student_list)
+final_questionList = scaler.fit_transform(final_questionList)
+questionList = scaler.fit_transform(questionList)
 
 train_skill_onehot = pca.fit_transform(train_skill_onehot.numpy())
 final_skill_onehot = pca.fit_transform(final_skill_onehot.numpy())
 
-train_skill_onehot = torch.from_numpy(train_skill_onehot)
-final_skill_onehot = torch.from_numpy(final_skill_onehot)
 studentList = torch.from_numpy(studentList)
-final_student_list = torch.from_numpy(final_student_list)
 stu_TF = torch.from_numpy(stu_TF)
+train_skill_onehot = torch.from_numpy(train_skill_onehot)
+questionList = torch.from_numpy(questionList)
+
+final_student_list = torch.from_numpy(final_student_list)
 final_TF = torch.from_numpy(final_TF)
+final_skill_onehot = torch.from_numpy(final_skill_onehot)
+final_questionList = torch.from_numpy(final_questionList)
 
 # student和skill构成的矩阵
-stu_skill = torch.cat((studentList, stu_TF, train_skill_onehot), dim=1)
-final_stu_skill = torch.cat((final_student_list, final_TF, final_skill_onehot), dim=1)
+stu_skill = torch.cat((studentList, stu_TF, questionList, train_skill_onehot), dim=1)
+final_stu_skill = torch.cat((final_student_list, final_TF, final_questionList, final_skill_onehot), dim=1)
 
 # 划分数据集
 train_onehot, test_onehot, train_corr, test_corr = train_test_split(stu_skill.numpy(), correctList, test_size=0.1,
@@ -101,60 +106,30 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-class LSTMAttention(nn.Module):
+class LinearG(nn.Module):
     def __init__(self):
-        super(LSTMAttention, self).__init__()
-        self.lstm = nn.LSTM(1, 50, bidirectional=False)
+        super(LinearG, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(50, 2)
+            nn.Linear(9, 9),
+            nn.ReLU(),
+            nn.BatchNorm1d(9),
+            nn.Linear(9, 2)
         )
 
-    def Attenion(self, lstm_output, final_state):
-        # lstm_output : [batch_size, seq_len, num_hidden * num_directions(=2)], F matrix
-        # final_state : [num_directions(=2), batch_size, num_hidden]
-        batch_size = len(lstm_output)
-        # hidden=[batch_size, num_hidden*num_directions(=2), 1]
-        hidden = final_state.view((batch_size, -1, 1))
-
-        # torch.bmm为多维矩阵的乘法：a=[b, h, w], c=[b,w,m]  bmm(a,b)=[b,h,m], 也就是对每一个batch都做矩阵乘法
-        # squeeze(2), 判断第三维上维度是否为1，若为1则去掉
-        # attn_weights:
-        # = [batch_size, seq_len, num_hidden * num_directions(=2)] @  [batch_size, num_hidden*num_directions(=2), 1]
-        # = [batch_size, seq_len, 1]
-        attn_weights = lstm_output @ hidden
-
-        soft_attn_weights = F.softmax(attn_weights, 1)
-
-        # context
-        # = [batch_size, num_hidden * num_directions(=2), seq_len] @  [batch_size, seq_len, 1]
-        # = [batch_size, num_hidden * num_directions]
-        context = (lstm_output.transpose(1, 2) @ soft_attn_weights).squeeze(2)
-        return context
 
     def forward(self, X):
         """
         :param X:[batch_size, seq_len]
         :return:
         """
-        # inputs: [batch_size, seq_len, embedding_dim]
-        inputs = X.unsqueeze(-1)
-        # inputs: [seq_len, batch_size, embedding_dim]
-        inputs = inputs.transpose(0, 1)
-        outputs, (final_hidden_state, final_cell_state) = self.lstm(inputs)
-        # output : [batch_size, seq_len, n_hidden]
-        # final_hidden_state : [1, batch_size, num_hidden]
-        outputs = outputs.transpose(0, 1)
-        attn_output = self.Attenion(outputs, final_hidden_state)
-
-        # attn_output : [batch_size, num_classes], attention : [batch_size, seq_len, 1]
-        outputs = self.fc(attn_output)
+        outputs = self.fc(X)
         return F.sigmoid(outputs)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
-net = LSTMAttention().to(device)
+net = LinearG().to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.003)
+optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
 
 
 def train():
@@ -201,7 +176,7 @@ if __name__ == "__main__":
         for p in preds:
             predict.append(p.item())
 
-    with open("res3.txt", 'w') as f:
+    with open("res4.txt", 'w') as f:
         for p in predict:
             p = str(p) + "\n"
             f.write(p)
