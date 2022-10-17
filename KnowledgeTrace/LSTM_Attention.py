@@ -154,7 +154,7 @@ class LSTMAttention(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 net = LSTMAttention().to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.003)
+optimizer = optim.Adam(net.parameters(), lr=0.003, weight_decay=0.0001)
 
 
 def train():
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         for p in preds:
             predict.append(p.item())
 
-    with open("res3.txt", 'w') as f:
+    with open("res5.txt", 'w') as f:
         for p in predict:
             p = str(p) + "\n"
             f.write(p)

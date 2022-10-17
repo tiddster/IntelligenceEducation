@@ -113,6 +113,7 @@ class LinearG(nn.Module):
             nn.Linear(9, 9),
             nn.ReLU(),
             nn.BatchNorm1d(9),
+            nn.Dropout(0.5),
             nn.Linear(9, 2)
         )
 
@@ -133,7 +134,7 @@ optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
 
 
 def train():
-    for epoch in range(200):
+    for epoch in range(40):
         train_total, train_correct = 0, 0
         for X, y in train_iter:
             X, y = X.to(device), y.to(device)
