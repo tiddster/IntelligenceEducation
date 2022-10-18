@@ -5,8 +5,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import TensorDataset
 
-train_path = "D:\新建文件夹\Dataset\DKT\\train.csv"
-final_path = "D:\新建文件夹\Dataset\DKT\\test.csv"
+train_path = "P:\Dataset\DKT\\train.csv"
+final_path = "P:\Dataset\DKT\\test.csv"
 
 skill_set = list(range(32))
 
